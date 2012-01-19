@@ -3,15 +3,21 @@ from boto.dynamodb.exceptions import DynamoDBKeyNotFoundError
 from django.conf import settings
 from django.contrib.sessions.backends.base import SessionBase, CreateError
 
-TABLE_NAME = getattr(settings, 'DYNAMODB_SESSIONS_TABLE_NAME', 'sessions')
-SESSION_KEY = getattr(settings, 'DYNAMODB_SESSIONS_TABLE_HASH_ATTRIB_NAME', 'session_key')
-ALWAYS_CONSISTENT = getattr(settings, 'DYNAMODB_SESSIONS_ALWAYS_CONSISTENT', False)
+TABLE_NAME = getattr(
+    settings, 'DYNAMODB_SESSIONS_TABLE_NAME', 'sessions')
+HASH_ATTRIB_NAME = getattr(
+    settings, 'DYNAMODB_SESSIONS_TABLE_HASH_ATTRIB_NAME', 'session_key')
+ALWAYS_CONSISTENT = getattr(
+    settings, 'DYNAMODB_SESSIONS_ALWAYS_CONSISTENT', False)
 
-AWS_ACCESS_KEY_ID = getattr(settings, 'DYNAMODB_SESSIONS_AWS_ACCESS_KEY_ID', False)
+AWS_ACCESS_KEY_ID = getattr(
+    settings, 'DYNAMODB_SESSIONS_AWS_ACCESS_KEY_ID', False)
 if not AWS_ACCESS_KEY_ID:
-    AWS_ACCESS_KEY_ID = getattr(settings, 'AWS_ACCESS_KEY_ID')
+    AWS_ACCESS_KEY_ID = getattr(
+        settings, 'AWS_ACCESS_KEY_ID')
 
-AWS_SECRET_ACCESS_KEY = getattr(settings, 'DYNAMODB_SESSIONS_AWS_SECRET_ACCESS_KEY', False)
+AWS_SECRET_ACCESS_KEY = getattr(
+    settings, 'DYNAMODB_SESSIONS_AWS_SECRET_ACCESS_KEY', False)
 if not AWS_SECRET_ACCESS_KEY:
     AWS_SECRET_ACCESS_KEY = getattr(settings, 'AWS_SECRET_ACCESS_KEY')
 
@@ -84,7 +90,7 @@ class SessionStore(SessionBase):
             # TODO: Update this once Layer2 has has_key.
             self.table.get_item(
                 session_key,
-                attributes_to_get=[SESSION_KEY],
+                attributes_to_get=[HASH_ATTRIB_NAME],
                 consistent_read=ALWAYS_CONSISTENT,
             )
         except DynamoDBKeyNotFoundError:
