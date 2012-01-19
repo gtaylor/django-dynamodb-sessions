@@ -1,4 +1,5 @@
 import boto
+from boto.dynamodb.exceptions import DynamoDBKeyNotFoundError
 from django.conf import settings
 from django.contrib.sessions.backends.base import SessionBase, CreateError
 
@@ -13,19 +14,42 @@ AWS_SECRET_ACCESS_KEY = getattr(settings, 'DYNAMODB_SESSIONS_AWS_SECRET_ACCESS_K
 if not AWS_SECRET_ACCESS_KEY:
     AWS_SECRET_ACCESS_KEY = getattr(settings, 'AWS_SECRET_ACCESS_KEY')
 
+# We'll find some better way to do this.
+_DYNAMODB_CONN = None
+
+def dynamodb_connection_factory():
+    """
+    Since SessionStore is called for every single page view, we'd be
+    establishing new connections so frequently that performance would be
+    hugely impacted. We'll lazy-load this here on a per-worker basis. Since
+    boto.dynamodb.layer2.Layer2 objects are state-less (aside from security
+    tokens), we're not too concerned about thread safety issues.
+    """
+    global _DYNAMODB_CONN
+    if not _DYNAMODB_CONN:
+        #print "Creating a connection."
+        _DYNAMODB_CONN = boto.connect_dynamodb(
+            aws_access_key_id=AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=AWS_SECRET_ACCESS_KEY
+        )
+    return _DYNAMODB_CONN
+
 class SessionStore(SessionBase):
     """
     Implements DynamoDB session store.
     """
     def __init__(self, session_key=None):
         super(SessionStore, self).__init__(session_key)
+        self.table = dynamodb_connection_factory().get_table(TABLE_NAME)
 
-        print "Creating a connection."
-        layer = boto.connect_dynamodb(
-            aws_access_key_id=AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=AWS_SECRET_ACCESS_KEY
-        )
-        self.table = layer.get_table(TABLE_NAME)
+    def _get_or_create_session_key(self):
+        """
+        This was added in Django 1.4 to SessionBase, but is simple enough to
+        just add here as well. Does as the name implies.
+        """
+        if self._session_key is None:
+            self._session_key = self._get_new_session_key()
+        return self._session_key
 
     def load(self):
         """
@@ -35,10 +59,10 @@ class SessionStore(SessionBase):
         :rtype: dict
         :returns: The de-coded session data, as a dict.
         """
-        print "LOADING SESSION", self.session_key
+        #print "LOADING SESSION", self.session_key
         try:
             item = self.table.get_item(self.session_key)
-        except KeyError:
+        except DynamoDBKeyNotFoundError:
             self.create()
             return {}
 
@@ -60,7 +84,7 @@ class SessionStore(SessionBase):
                 session_key,
                 attributes_to_get=[SESSION_KEY],
             )
-        except KeyError:
+        except DynamoDBKeyNotFoundError:
             return False
 
         return True
@@ -70,10 +94,10 @@ class SessionStore(SessionBase):
         Creates a new entry in DynamoDB. This may or may not actually
         have anything in it.
         """
-        print "CREATING SESSION"
+        #print "CREATING SESSION"
         while True:
             self.session_key = self._get_new_session_key()
-            print "  GENERATED KEY:", self.session_key
+            #print "  GENERATED KEY:", self.session_key
             try:
                 # Save immediately to ensure we have a unique entry in the
                 # database.
@@ -96,13 +120,13 @@ class SessionStore(SessionBase):
             with the current session key already exists.
         """
         session_key = self._get_or_create_session_key()
-        print "SAVING SESSION", session_key
+        #print "SAVING SESSION", session_key
         if must_create:
             try:
                 self.table.get_item(session_key)
                 # There's already an item with this key.
                 raise CreateError
-            except KeyError:
+            except DynamoDBKeyNotFoundError:
                 # There's already an item with this key. We're golden.
                 pass
 
@@ -127,11 +151,9 @@ class SessionStore(SessionBase):
                 return
             session_key = self.session_key
 
-        print "DELETING SESSION", session_key
-        try:
-            item = self.table.get_item(session_key)
-        except KeyError:
-            # The item is already gone. Fail silently.
-            return
-
-        item.delete()
+        #print "DELETING SESSION", session_key
+        key = self.table.schema.build_key_from_values(
+            session_key,
+            range_key=None
+        )
+        self.table.layer1.delete_item(self.table.name, key)
