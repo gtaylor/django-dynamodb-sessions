@@ -10,9 +10,13 @@ django-dynamodb-sessions
 Status
 ------
 
-media-nommer is currently in very early development. At this time, the
-software is probably only appropriate for those with a strong grasp on
-Python and Amazon AWS.
+django-dynamodb-sessions has worked for us in limited testing, but this is
+a backend that is tracking an API that is constantly changing right now.
+Other known issues/limitations:
+
+* Sessions are currently permanent, with no way to expire them. As the boto
+  DynamoDB API improves, this will be resolved without breaking backwards
+  compatibility.
 
 Set up your DynamoDB Table
 --------------------------
