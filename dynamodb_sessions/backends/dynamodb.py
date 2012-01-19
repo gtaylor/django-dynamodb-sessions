@@ -4,7 +4,8 @@ from django.conf import settings
 from django.contrib.sessions.backends.base import SessionBase, CreateError
 
 TABLE_NAME = getattr(settings, 'DYNAMODB_SESSIONS_TABLE_NAME', 'sessions')
-SESSION_KEY = getattr(settings, 'DYNAMODB_SESSIONS_TABLE_PRIMARY_KEY', 'session_key')
+SESSION_KEY = getattr(settings, 'DYNAMODB_SESSIONS_TABLE_HASH_ATTRIB_NAME', 'session_key')
+ALWAYS_CONSISTENT = getattr(settings, 'DYNAMODB_SESSIONS_ALWAYS_CONSISTENT', False)
 
 AWS_ACCESS_KEY_ID = getattr(settings, 'DYNAMODB_SESSIONS_AWS_ACCESS_KEY_ID', False)
 if not AWS_ACCESS_KEY_ID:
@@ -61,7 +62,8 @@ class SessionStore(SessionBase):
         """
         #print "LOADING SESSION", self.session_key
         try:
-            item = self.table.get_item(self.session_key)
+            item = self.table.get_item(self.session_key,
+                                       consistent_read=ALWAYS_CONSISTENT)
         except DynamoDBKeyNotFoundError:
             self.create()
             return {}
@@ -83,6 +85,7 @@ class SessionStore(SessionBase):
             self.table.get_item(
                 session_key,
                 attributes_to_get=[SESSION_KEY],
+                consistent_read=ALWAYS_CONSISTENT,
             )
         except DynamoDBKeyNotFoundError:
             return False
@@ -123,7 +126,8 @@ class SessionStore(SessionBase):
         #print "SAVING SESSION", session_key
         if must_create:
             try:
-                self.table.get_item(session_key)
+                self.table.get_item(session_key,
+                                    consistent_read=ALWAYS_CONSISTENT)
                 # There's already an item with this key.
                 raise CreateError
             except DynamoDBKeyNotFoundError:
