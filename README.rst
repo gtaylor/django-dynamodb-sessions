@@ -16,7 +16,7 @@ Python and Amazon AWS.
 Installation
 -------------
 
-In your :file:`settings.py` file, you'll need something like this::
+In your ``settings.py`` file, you'll need something like this::
 
     SESSION_ENGINE = 'dynamodb_sessions.backends.dynamodb'
     DYNAMODB_SESSIONS_AWS_ACCESS_KEY_ID = 'YourKeyIDHere'
