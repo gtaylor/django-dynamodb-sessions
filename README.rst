@@ -51,12 +51,22 @@ so you'll need to install this from git, as well::
 
 In your ``settings.py`` file, you'll need something like this::
 
-    SESSION_ENGINE = 'dynamodb_sessions.backends.dynamodb'
     DYNAMODB_SESSIONS_AWS_ACCESS_KEY_ID = 'YourKeyIDHere'
     DYNAMODB_SESSIONS_AWS_SECRET_ACCESS_KEY = 'YourSecretHere'
 
-After that, keep an eye on your Amazon Management Console to see if you need
-to scale your read/write units up or down.
+If you'd like to add a caching layer between your application and DynamoDB
+to reduce queries (like Django's cached_db backend), set your session
+backend to::
+
+    SESSION_ENGINE = 'dynamodb_sessions.backends.cached_dynamodb'
+
+Otherwise, go straight to DynamoDB::
+
+    SESSION_ENGINE = 'dynamodb_sessions.backends.dynamodb'
+    DYNAMODB_SESSIONS_ALWAYS_CONSISTENT = True
+
+After that, fire her up and keep an eye on your Amazon Management Console
+to see if you need to scale your read/write units up or down.
 
 If you encounter any bugs, have questions, or would like to share an idea,
 hit up our `issue tracker`_.
