@@ -1,4 +1,5 @@
 import boto
+import logging
 from boto.dynamodb.exceptions import DynamoDBKeyNotFoundError
 from django.conf import settings
 from django.contrib.sessions.backends.base import SessionBase, CreateError
@@ -24,6 +25,8 @@ if not AWS_SECRET_ACCESS_KEY:
 # We'll find some better way to do this.
 _DYNAMODB_CONN = None
 
+logger = logging.getLogger(__name__)
+
 def dynamodb_connection_factory():
     """
     Since SessionStore is called for every single page view, we'd be
@@ -34,7 +37,7 @@ def dynamodb_connection_factory():
     """
     global _DYNAMODB_CONN
     if not _DYNAMODB_CONN:
-        #print "Creating a connection."
+        logger.debug("Creating a DynamoDB connection.")
         _DYNAMODB_CONN = boto.connect_dynamodb(
             aws_access_key_id=AWS_ACCESS_KEY_ID,
             aws_secret_access_key=AWS_SECRET_ACCESS_KEY
@@ -66,7 +69,7 @@ class SessionStore(SessionBase):
         :rtype: dict
         :returns: The de-coded session data, as a dict.
         """
-        #print "LOADING SESSION", self.session_key
+        logger.debug("Loading session data for: %s" % self.session_key)
         try:
             item = self.table.get_item(self.session_key,
                                        consistent_read=ALWAYS_CONSISTENT)
@@ -85,34 +88,34 @@ class SessionStore(SessionBase):
         :returns: ``True`` if a session with the given key exists in the DB,
             ``False`` if not.
         """
-        print "SESSION EXISTS?", session_key
-        try:
-            # TODO: Update this once Layer2 has has_key.
-            self.table.get_item(
-                session_key,
-                attributes_to_get=[HASH_ATTRIB_NAME],
-                consistent_read=ALWAYS_CONSISTENT,
-            )
-        except DynamoDBKeyNotFoundError:
+        logger.debug("Session key exists?: %s" % session_key)
+        key_already_exists = self.table.has_item(
+            session_key,
+            consistent_read=ALWAYS_CONSISTENT,
+        )
+        if key_already_exists:
+            logger.debug("  - Yes, key exists.")
+            return True
+        else:
+            logger.debug("  - No, key doesn't exist.")
             return False
-
-        return True
 
     def create(self):
         """
         Creates a new entry in DynamoDB. This may or may not actually
         have anything in it.
         """
-        #print "CREATING SESSION"
+        logger.debug("Creating a new session")
         while True:
             self.session_key = self._get_new_session_key()
-            #print "  GENERATED KEY:", self.session_key
+            logger.debug("  - New session key: %s" % self.session_key)
             try:
                 # Save immediately to ensure we have a unique entry in the
                 # database.
                 self.save(must_create=True)
             except CreateError:
                 # Key wasn't unique. Try again.
+                logger.debug("  - Key wasn't unique, trying again...")
                 continue
             self.modified = True
             self._session_cache = {}
@@ -129,16 +132,16 @@ class SessionStore(SessionBase):
             with the current session key already exists.
         """
         session_key = self._get_or_create_session_key()
-        #print "SAVING SESSION", session_key
+        logger.debug("Saving session: %s" % session_key)
         if must_create:
-            try:
-                self.table.get_item(session_key,
-                                    consistent_read=ALWAYS_CONSISTENT)
+            logger.debug("  - Must create is True, checking for key first.")
+            key_already_exists = self.table.has_item(
+                session_key,
+                consistent_read=ALWAYS_CONSISTENT
+            )
+            if key_already_exists:
                 # There's already an item with this key.
                 raise CreateError
-            except DynamoDBKeyNotFoundError:
-                # There's already an item with this key. We're golden.
-                pass
 
         # This base64 encodes session data.
         data = self.encode(self._get_session(no_load=must_create))
@@ -161,9 +164,10 @@ class SessionStore(SessionBase):
                 return
             session_key = self.session_key
 
-        #print "DELETING SESSION", session_key
-        key = self.table.schema.build_key_from_values(
+        logger.debug("Deleting session: %s" % session_key)
+        key = self.table.layer2.build_key_from_values(
+            self.table.schema,
             session_key,
             range_key=None
         )
-        self.table.layer1.delete_item(self.table.name, key)
+        self.table.layer2.layer1.delete_item(self.table.name, key)
