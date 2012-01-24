@@ -77,7 +77,7 @@ class SessionStore(SessionBase):
             self.create()
             return {}
 
-        session_data = item.attrs['data']
+        session_data = item['data']
         return self.decode(session_data)
 
     def exists(self, session_key):
