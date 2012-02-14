@@ -18,7 +18,7 @@ class SessionStore(DynamoDBStore):
 
     @property
     def cache_key(self):
-        return KEY_PREFIX + self._get_or_create_session_key()
+        return KEY_PREFIX + self.session_key
 
     def load(self):
         data = cache.get(self.cache_key, None)
