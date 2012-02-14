@@ -76,15 +76,6 @@ class SessionStore(SessionBase):
         % (randrange(0, MAX_SESSION_KEY), pid, time.time(),
            settings.SECRET_KEY)).hexdigest()
 
-    def _get_or_create_session_key(self):
-        """
-        This was added in Django 1.4 to SessionBase, but is simple enough to
-        just add here as well. Does as the name implies.
-        """
-        if self._session_key is None:
-            self._session_key = self._get_new_session_key()
-        return self._session_key
-
     def load(self):
         """
         Loads session data from DynamoDB, runs it through the session
@@ -158,10 +149,10 @@ class SessionStore(SessionBase):
 
         if must_create:
             # Force the generation of a new session key.
-            self._session_key = self._get_new_session_key()
-            logger.debug("  - Saving new session: %s" % self._session_key)
+            self.session_key = self._get_new_session_key()
+            logger.debug("  - Saving new session: %s" % self.session_key)
             item = self.table.new_item(
-                self._session_key,
+                self.session_key,
                 # Stuff the base64 encoded stuff into the 'data' attrib.
                 attrs={
                     'data': data,
@@ -176,11 +167,10 @@ class SessionStore(SessionBase):
                 # There's already an item with this key.
                 raise CreateError
         else:
-            self._session_key = self._get_or_create_session_key()
-            logger.debug("Saving existing session: %s" % self._session_key)
+            logger.debug("Saving existing session: %s" % self.session_key)
             # This isn't really creating a new item, just a container for
             # us to use put_attribute to queue an attrib update to.
-            item = self.table.new_item(self._session_key)
+            item = self.table.new_item(self.session_key)
             # Queue up a PUT operation for UpdateItem, which preserves the
             # existing 'created' attribute.
             item.put_attribute('data', data)
