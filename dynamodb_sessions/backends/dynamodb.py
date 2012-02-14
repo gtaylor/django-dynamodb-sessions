@@ -14,7 +14,7 @@ TABLE_NAME = getattr(
 HASH_ATTRIB_NAME = getattr(
     settings, 'DYNAMODB_SESSIONS_TABLE_HASH_ATTRIB_NAME', 'session_key')
 ALWAYS_CONSISTENT = getattr(
-    settings, 'DYNAMODB_SESSIONS_ALWAYS_CONSISTENT', False)
+    settings, 'DYNAMODB_SESSIONS_ALWAYS_CONSISTENT', True)
 
 AWS_ACCESS_KEY_ID = getattr(
     settings, 'DYNAMODB_SESSIONS_AWS_ACCESS_KEY_ID', False)

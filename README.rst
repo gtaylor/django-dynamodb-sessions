@@ -93,7 +93,7 @@ The following settings may be used in your ``settings.py``:
                                       reads from DynamoDB to be consistent.
                                       This may lead to slightly slower queries,
                                       but you'll never miss object
-                                      creation/edits.
+                                      creation/edits. Defaults to ``True``.
 :DYNAMODB_SESSIONS_AWS_ACCESS_KEY_ID: The access key for the AWS account
                                       to use for DynamoDB.
 :DYNAMODB_SESSIONS_AWS_SECRET_ACCESS_KEY: The secret for the AWS account
