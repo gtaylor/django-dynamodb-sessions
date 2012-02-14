@@ -10,13 +10,14 @@ django-dynamodb-sessions
 Status
 ------
 
-django-dynamodb-sessions has worked for us in limited testing, but this is
-a backend that is tracking an API that is constantly changing right now.
-Other known issues/limitations:
+django-dynamodb-sessions has seen some use on small test environments within
+EC2. While it should be ready for prime time, it hasn't been heavily battle
+tested just yet. Other notes:
 
-* Sessions are currently permanent, with no way to expire them. As the boto
-  DynamoDB API improves, this will be resolved without breaking backwards
-  compatibility.
+* There is currently no management command to remove expired sessions. We
+  can't re-use the Django cleanup command, so we'll have to write our own.
+  This will be added in the next release, we're already setting expiration
+  attributes to drive the cleanup.
 
 Set up your DynamoDB Table
 --------------------------
@@ -43,15 +44,9 @@ Django app.
 Installation
 -------------
 
-The current, released version of Boto_ lacks DynamoDB support, so you'll need
-to install from their current git master branch::
+Install django-dynamodb-sessions using ``pip`` or ``easy_install``::
 
-    pip install --upgrade git+http://github.com/boto/boto.git#egg=boto
-
-This package hasn't made it to PyPi (and won't until Boto's API settles),
-so you'll need to install this from git, as well::
-
-    pip install --upgrade git+http://github.com/gtaylor/django-dynamodb-sessions.git#egg=dynamodb_sessions
+    pip install django-dynamodb-sessions
 
 In your ``settings.py`` file, you'll need something like this::
 
