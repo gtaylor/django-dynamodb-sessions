@@ -32,7 +32,7 @@ in the AWS Management Console. Then:
 * Select a ``String`` hash attribute type.
 * Enter ``session_key`` for *Hash Attribute Name*.
 * Hit the *Continue* button.
-* Decide on throughput. The free tier is 5 read capacity units, 10 write.
+* Decide on throughput. The free tier is 10 read capacity units, 5 write.
 * Finish the rest of the steps
 
 After your table is created, you're ready to install the module on your
