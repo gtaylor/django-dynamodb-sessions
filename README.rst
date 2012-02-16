@@ -62,7 +62,6 @@ backend to::
 Otherwise, go straight to DynamoDB::
 
     SESSION_ENGINE = 'dynamodb_sessions.backends.dynamodb'
-    DYNAMODB_SESSIONS_ALWAYS_CONSISTENT = True
 
 After that, fire her up and keep an eye on your Amazon Management Console
 to see if you need to scale your read/write units up or down.
@@ -93,6 +92,24 @@ The following settings may be used in your ``settings.py``:
                                       to use for DynamoDB.
 :DYNAMODB_SESSIONS_AWS_SECRET_ACCESS_KEY: The secret for the AWS account
                                           to use for DynamoDB.
+
+Changes
+-------
+
+0.3
+^^^
+
+* Re-packaging with setuptools instead of distutils.
+
+0.2
+^^^
+
+* Correcting an issue with the cached_dynamodb backend.
+
+0.1
+^^^
+
+* Initial release.
 
 License
 -------

@@ -1,4 +1,4 @@
-from distutils.core import setup
+from setuptools import setup, find_packages
 import dynamodb_sessions
 
 long_description = open('README.rst').read()
@@ -9,7 +9,7 @@ version_str = '%d.%d' % (major_ver, minor_ver)
 setup(
     name='django-dynamodb-sessions',
     version=version_str,
-    packages=['dynamodb_sessions', 'dynamodb_sessions.backends'],
+    packages=find_packages(),
     description="A Django session backend using Amazon's DynamoDB",
     long_description=long_description,
     author='Gregory Taylor',
@@ -17,7 +17,7 @@ setup(
     license='BSD License',
     url='https://github.com/gtaylor/django-dynamodb-sessions',
     platforms=["any"],
-    requires=['django', "boto (>=2.2.1)"],
+    install_requires=['django', "boto>=2.2.2"],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
