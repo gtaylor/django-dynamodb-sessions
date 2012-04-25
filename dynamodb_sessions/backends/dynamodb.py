@@ -1,10 +1,9 @@
-import os
 import time
 import logging
 
 import boto
 from django.conf import settings
-from django.contrib.sessions.backends.base import SessionBase, CreateError, MAX_SESSION_KEY
+from django.contrib.sessions.backends.base import SessionBase, CreateError
 from django.utils.hashcompat import md5_constructor
 from boto.dynamodb.exceptions import DynamoDBKeyNotFoundError
 from boto.exception import DynamoDBResponseError
@@ -57,24 +56,6 @@ class SessionStore(SessionBase):
         super(SessionStore, self).__init__(session_key)
         self.table = dynamodb_connection_factory().get_table(TABLE_NAME)
 
-    def _get_new_session_key(self):
-        """
-        Returns session key.
-        """
-        # The random module is seeded when this Apache child is created.
-        # Use settings.SECRET_KEY as added salt.
-        try:
-            pid = os.getpid()
-        except AttributeError:
-            # No getpid() in Jython, for example
-            pid = 1
-
-        # Unlike the method this overrides, assume that the hash is good
-        # to use. save(must_create=True) will make sure that this is
-        # unique.
-        return md5_constructor("%s%s%s%s"
-        % (randrange(0, MAX_SESSION_KEY), pid, time.time(),
-           settings.SECRET_KEY)).hexdigest()
 
     def load(self):
         """
