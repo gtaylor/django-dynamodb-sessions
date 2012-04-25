@@ -96,6 +96,11 @@ The following settings may be used in your ``settings.py``:
 Changes
 -------
 
+0.4
+^^^
+
+* Django 1.4 compatibility, and unnecessary code removal. (AdamN)
+
 0.3
 ^^^
 
