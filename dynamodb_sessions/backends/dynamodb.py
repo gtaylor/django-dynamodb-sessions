@@ -4,7 +4,7 @@ import logging
 
 import boto
 from django.conf import settings
-from django.contrib.sessions.backends.base import SessionBase, CreateError, randrange, MAX_SESSION_KEY
+from django.contrib.sessions.backends.base import SessionBase, CreateError, MAX_SESSION_KEY
 from django.utils.hashcompat import md5_constructor
 from boto.dynamodb.exceptions import DynamoDBKeyNotFoundError
 from boto.exception import DynamoDBResponseError
