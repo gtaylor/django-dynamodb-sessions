@@ -130,7 +130,7 @@ class SessionStore(SessionBase):
 
         if must_create:
             # Force the generation of a new session key.
-            self.session_key = self._get_new_session_key()
+            self._session_key = self._get_new_session_key()
             logger.debug("  - Saving new session: %s" % self.session_key)
             item = self.table.new_item(
                 self.session_key,
