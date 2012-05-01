@@ -1,3 +1,3 @@
 __author__ = 'gtaylor'
 # Major, minor
-__version__ = (0, 4)
+__version__ = (0, 5)
