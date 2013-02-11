@@ -4,7 +4,8 @@ import logging
 import boto
 from django.conf import settings
 from django.contrib.sessions.backends.base import SessionBase, CreateError
-from django.utils.hashcompat import md5_constructor
+from django.core.exceptions import SuspiciousOperation
+
 from boto.dynamodb.exceptions import DynamoDBKeyNotFoundError
 from boto.exception import DynamoDBResponseError
 
@@ -65,11 +66,11 @@ class SessionStore(SessionBase):
         :rtype: dict
         :returns: The de-coded session data, as a dict.
         """
-        logger.debug("Loading session data for: %s" % self.session_key)
+        
         try:
             item = self.table.get_item(self.session_key,
                                        consistent_read=ALWAYS_CONSISTENT)
-        except DynamoDBKeyNotFoundError:
+        except (DynamoDBKeyNotFoundError,SuspiciousOperation):
             self.create()
             return {}
 
@@ -84,16 +85,13 @@ class SessionStore(SessionBase):
         :returns: ``True`` if a session with the given key exists in the DB,
             ``False`` if not.
         """
-        logger.debug("Session key exists?: %s" % session_key)
         key_already_exists = self.table.has_item(
             session_key,
             consistent_read=ALWAYS_CONSISTENT,
         )
         if key_already_exists:
-            logger.debug("  - Yes, key exists.")
             return True
         else:
-            logger.debug("  - No, key doesn't exist.")
             return False
 
     def create(self):
@@ -101,15 +99,13 @@ class SessionStore(SessionBase):
         Creates a new entry in DynamoDB. This may or may not actually
         have anything in it.
         """
-        logger.debug("Creating a new session")
         while True:
+            self._session_key = self._get_new_session_key()
             try:
                 # Save immediately to ensure we have a unique entry in the
                 # database.
                 self.save(must_create=True)
             except CreateError:
-                # Key wasn't unique. Try again.
-                logger.debug("  - Key wasn't unique, trying again...")
                 continue
             self.modified = True
             self._session_cache = {}
@@ -125,40 +121,20 @@ class SessionStore(SessionBase):
         :raises: ``CreateError`` if ``must_create`` is ``True`` and a session
             with the current session key already exists.
         """
-        # This base64 encodes session data.
-        data = self.encode(self._get_session(no_load=must_create))
-
+        self._session_key = self._get_or_create_session_key()
+            
+        item = self.table.new_item(self.session_key)
+        # Queue up a PUT operation for UpdateItem, which preserves the
+        # existing 'created' attribute.
+        item.put_attribute('data',self.encode(self._get_session(no_load=must_create)))
+        
         if must_create:
-            # Force the generation of a new session key.
-            self._session_key = self._get_new_session_key()
-            logger.debug("  - Saving new session: %s" % self.session_key)
-            item = self.table.new_item(
-                self.session_key,
-                # Stuff the base64 encoded stuff into the 'data' attrib.
-                attrs={
-                    'data': data,
-                    # This will be used for session expiration.
-                    'created': int(time.time()),
-                }
-            )
-            try:
-                # We expect the 'data' attribute to not exist.
-                item.put(expected_value={'data': False})
-            except DynamoDBResponseError:
-                # There's already an item with this key.
-                raise CreateError
-        else:
-            logger.debug("Saving existing session: %s" % self.session_key)
-            # This isn't really creating a new item, just a container for
-            # us to use put_attribute to queue an attrib update to.
-            item = self.table.new_item(self.session_key)
-            # Queue up a PUT operation for UpdateItem, which preserves the
-            # existing 'created' attribute.
-            item.put_attribute('data', data)
-            # Commits the PUT UpdateItem for the 'data' attrib, meanwhile
-            # leaving the 'created' attrib un-touched.
-            item.save()
-
+            #If 
+            item.put_attribute('created',int(time.time()))
+        # Commits the PUT UpdateItem for the 'data' attrib, meanwhile
+        # leaving the 'created' attrib un-touched.                   
+        item.save()
+        
     def delete(self, session_key=None):
         """
         Deletes the current session, or the one specified in ``session_key``.
@@ -171,7 +147,6 @@ class SessionStore(SessionBase):
                 return
             session_key = self.session_key
 
-        logger.debug("Deleting session: %s" % session_key)
         key = self.table.layer2.build_key_from_values(
             self.table.schema,
             session_key,
