@@ -2,9 +2,13 @@
 *.swp
 *.tmp
 *~
+*.pydevproject
+*.project
 .idea
 MANIFEST
 build
 dist
 boto
+testapp/
+manage.py
 *.egg-info

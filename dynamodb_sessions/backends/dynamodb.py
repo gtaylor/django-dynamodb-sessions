@@ -120,19 +120,23 @@ class SessionStore(SessionBase):
         :raises: ``CreateError`` if ``must_create`` is ``True`` and a session
             with the current session key already exists.
         """
-        self._session_key = self._get_or_create_session_key()
-            
+        
+        if must_create:
+            self._session_key = None
+        
+        self._get_or_create_session_key()
         item = self.table.new_item(self.session_key)
         # Queue up a PUT operation for UpdateItem, which preserves the
         # existing 'created' attribute.
         item.put_attribute('data',self.encode(self._get_session(no_load=must_create)))
         
         if must_create:
-            #If 
             item.put_attribute('created',int(time.time()))
-        # Commits the PUT UpdateItem for the 'data' attrib, meanwhile
-        # leaving the 'created' attrib un-touched.                   
-        item.save()
+            item.put(expected_value={'data': False})
+        else:
+            # Commits the PUT UpdateItem for the 'data' attrib, meanwhile
+            # leaving the 'created' attrib un-touched.                   
+            item.save()
         
     def delete(self, session_key=None):
         """
