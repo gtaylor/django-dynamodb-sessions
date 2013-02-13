@@ -120,7 +120,10 @@ class SessionStore(SessionBase):
         :raises: ``CreateError`` if ``must_create`` is ``True`` and a session
             with the current session key already exists.
         """
-        
+        # If the save method is called with must_create equal to True, I'm 
+        # setting self._session_key equal to None and when 
+        # self.get_or_create_session_key is called the new 
+        # session_key will be created.
         if must_create:
             self._session_key = None
         
@@ -131,7 +134,10 @@ class SessionStore(SessionBase):
         item.put_attribute('data',self.encode(self._get_session(no_load=must_create)))
         
         if must_create:
+            
             item.put_attribute('created',int(time.time()))
+            # We expect the data value to be False because we are creating a
+            # new session
             item.put(expected_value={'data': False})
         else:
             # Commits the PUT UpdateItem for the 'data' attrib, meanwhile
