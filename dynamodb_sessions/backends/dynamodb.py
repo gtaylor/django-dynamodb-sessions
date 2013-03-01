@@ -6,8 +6,10 @@ from django.conf import settings
 from django.contrib.sessions.backends.base import SessionBase, CreateError
 from django.core.exceptions import SuspiciousOperation
 
+from boto.dynamodb import connect_to_region
 from boto.dynamodb.exceptions import DynamoDBKeyNotFoundError
 from boto.exception import DynamoDBResponseError
+
 
 TABLE_NAME = getattr(
     settings, 'DYNAMODB_SESSIONS_TABLE_NAME', 'sessions')
@@ -27,10 +29,15 @@ AWS_SECRET_ACCESS_KEY = getattr(
 if not AWS_SECRET_ACCESS_KEY:
     AWS_SECRET_ACCESS_KEY = getattr(settings, 'AWS_SECRET_ACCESS_KEY')
 
+AWS_REGION_NAME = getattr(settings, 'DYNAMODB_SESSIONS_AWS_REGION_NAME', False)
+if not AWS_REGION_NAME:
+    AWS_REGION_NAME = getattr(settings, 'AWS_REGION_NAME', 'us-east-1')
+
 # We'll find some better way to do this.
 _DYNAMODB_CONN = None
 
 logger = logging.getLogger(__name__)
+
 
 def dynamodb_connection_factory():
     """
@@ -43,11 +50,13 @@ def dynamodb_connection_factory():
     global _DYNAMODB_CONN
     if not _DYNAMODB_CONN:
         logger.debug("Creating a DynamoDB connection.")
-        _DYNAMODB_CONN = boto.connect_dynamodb(
+        _DYNAMODB_CONN = connect_to_region(
+            AWS_REGION_NAME,
             aws_access_key_id=AWS_ACCESS_KEY_ID,
             aws_secret_access_key=AWS_SECRET_ACCESS_KEY
         )
     return _DYNAMODB_CONN
+
 
 class SessionStore(SessionBase):
     """
@@ -66,7 +75,7 @@ class SessionStore(SessionBase):
         :rtype: dict
         :returns: The de-coded session data, as a dict.
         """
-        
+
         try:
             item = self.table.get_item(self.session_key,
                                        consistent_read=ALWAYS_CONSISTENT)
@@ -120,30 +129,30 @@ class SessionStore(SessionBase):
         :raises: ``CreateError`` if ``must_create`` is ``True`` and a session
             with the current session key already exists.
         """
-        # If the save method is called with must_create equal to True, I'm 
-        # setting self._session_key equal to None and when 
-        # self.get_or_create_session_key is called the new 
+        # If the save method is called with must_create equal to True, I'm
+        # setting self._session_key equal to None and when
+        # self.get_or_create_session_key is called the new
         # session_key will be created.
         if must_create:
             self._session_key = None
-        
+
         self._get_or_create_session_key()
         item = self.table.new_item(self.session_key)
         # Queue up a PUT operation for UpdateItem, which preserves the
         # existing 'created' attribute.
         item.put_attribute('data',self.encode(self._get_session(no_load=must_create)))
-        
+
         if must_create:
-            
+
             item.put_attribute('created',int(time.time()))
             # We expect the data value to be False because we are creating a
             # new session
             item.put(expected_value={'data': False})
         else:
             # Commits the PUT UpdateItem for the 'data' attrib, meanwhile
-            # leaving the 'created' attrib un-touched.                   
+            # leaving the 'created' attrib un-touched.
             item.save()
-        
+
     def delete(self, session_key=None):
         """
         Deletes the current session, or the one specified in ``session_key``.

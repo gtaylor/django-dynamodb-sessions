@@ -92,6 +92,7 @@ The following settings may be used in your ``settings.py``:
                                       to use for DynamoDB.
 :DYNAMODB_SESSIONS_AWS_SECRET_ACCESS_KEY: The secret for the AWS account
                                           to use for DynamoDB.
+:DYNAMODB_SESSIONS_AWS_REGION_NAME: The region to use for DynamoDB.
 
 Changes
 -------
