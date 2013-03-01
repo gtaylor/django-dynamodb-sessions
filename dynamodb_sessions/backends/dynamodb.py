@@ -6,8 +6,10 @@ from django.conf import settings
 from django.contrib.sessions.backends.base import SessionBase, CreateError
 from django.core.exceptions import SuspiciousOperation
 
+from boto.dynamodb import connect_to_region
 from boto.dynamodb.exceptions import DynamoDBKeyNotFoundError
 from boto.exception import DynamoDBResponseError
+
 
 TABLE_NAME = getattr(
     settings, 'DYNAMODB_SESSIONS_TABLE_NAME', 'sessions')
@@ -48,10 +50,10 @@ def dynamodb_connection_factory():
     global _DYNAMODB_CONN
     if not _DYNAMODB_CONN:
         logger.debug("Creating a DynamoDB connection.")
-        _DYNAMODB_CONN = boto.connect_dynamodb(
+        _DYNAMODB_CONN = connect_to_region(
+            AWS_REGION_NAME,
             aws_access_key_id=AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-            region=AWS_REGION_NAME
+            aws_secret_access_key=AWS_SECRET_ACCESS_KEY
         )
     return _DYNAMODB_CONN
 
