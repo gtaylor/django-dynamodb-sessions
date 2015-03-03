@@ -1,14 +1,12 @@
 import time
 import logging
 
-import boto
 from django.conf import settings
 from django.contrib.sessions.backends.base import SessionBase, CreateError
 from django.core.exceptions import SuspiciousOperation
 
 from boto.dynamodb import connect_to_region
 from boto.dynamodb.exceptions import DynamoDBKeyNotFoundError
-from boto.exception import DynamoDBResponseError
 
 
 TABLE_NAME = getattr(
