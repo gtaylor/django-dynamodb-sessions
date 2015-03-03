@@ -45,6 +45,7 @@ def dynamodb_connection_factory():
     boto.dynamodb.layer2.Layer2 objects are state-less (aside from security
     tokens), we're not too concerned about thread safety issues.
     """
+
     global _DYNAMODB_CONN
     if not _DYNAMODB_CONN:
         logger.debug("Creating a DynamoDB connection.")
@@ -60,10 +61,10 @@ class SessionStore(SessionBase):
     """
     Implements DynamoDB session store.
     """
+
     def __init__(self, session_key=None):
         super(SessionStore, self).__init__(session_key)
         self.table = dynamodb_connection_factory().get_table(TABLE_NAME)
-
 
     def load(self):
         """
@@ -75,9 +76,9 @@ class SessionStore(SessionBase):
         """
 
         try:
-            item = self.table.get_item(self.session_key,
-                                       consistent_read=ALWAYS_CONSISTENT)
-        except (DynamoDBKeyNotFoundError,SuspiciousOperation):
+            item = self.table.get_item(
+                self.session_key, consistent_read=ALWAYS_CONSISTENT)
+        except (DynamoDBKeyNotFoundError, SuspiciousOperation):
             self.create()
             return {}
 
@@ -92,6 +93,7 @@ class SessionStore(SessionBase):
         :returns: ``True`` if a session with the given key exists in the DB,
             ``False`` if not.
         """
+
         key_already_exists = self.table.has_item(
             session_key,
             consistent_read=ALWAYS_CONSISTENT,
@@ -106,6 +108,7 @@ class SessionStore(SessionBase):
         Creates a new entry in DynamoDB. This may or may not actually
         have anything in it.
         """
+
         while True:
             try:
                 # Save immediately to ensure we have a unique entry in the
@@ -127,6 +130,7 @@ class SessionStore(SessionBase):
         :raises: ``CreateError`` if ``must_create`` is ``True`` and a session
             with the current session key already exists.
         """
+
         # If the save method is called with must_create equal to True, I'm
         # setting self._session_key equal to None and when
         # self.get_or_create_session_key is called the new
@@ -138,11 +142,11 @@ class SessionStore(SessionBase):
         item = self.table.new_item(self.session_key)
         # Queue up a PUT operation for UpdateItem, which preserves the
         # existing 'created' attribute.
-        item.put_attribute('data',self.encode(self._get_session(no_load=must_create)))
+        item.put_attribute('data', self.encode(self._get_session(no_load=must_create)))
 
         if must_create:
 
-            item.put_attribute('created',int(time.time()))
+            item.put_attribute('created', int(time.time()))
             # We expect the data value to be False because we are creating a
             # new session
             item.put(expected_value={'data': False})
@@ -158,6 +162,7 @@ class SessionStore(SessionBase):
         :keyword str session_key: Optionally, override the session key
             to delete.
         """
+
         if session_key is None:
             if self.session_key is None:
                 return

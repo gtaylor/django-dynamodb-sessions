@@ -97,6 +97,12 @@ The following settings may be used in your ``settings.py``:
 Changes
 -------
 
+0.6
+^^^
+
+* Removing some no longer used imports.
+* PEP8 cleanup.
+
 0.5
 ^^^
 

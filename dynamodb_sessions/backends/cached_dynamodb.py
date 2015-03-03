@@ -3,10 +3,12 @@ Cached, DynamoDB-backed sessions.
 """
 
 from django.conf import settings
-from dynamodb_sessions.backends.dynamodb import SessionStore as DynamoDBStore
 from django.core.cache import cache
 
+from dynamodb_sessions.backends.dynamodb import SessionStore as DynamoDBStore
+
 KEY_PREFIX = "dynamodb_sessions.backends.cached_dynamodb"
+
 
 class SessionStore(DynamoDBStore):
     """
@@ -49,6 +51,7 @@ class SessionStore(DynamoDBStore):
         Removes the current session data from the database and regenerates the
         key.
         """
+
         self.clear()
         self.delete(self.session_key)
         self.create()
