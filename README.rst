@@ -4,6 +4,7 @@ django-dynamodb-sessions
 :Info: This package contains a simple Django session backend that uses
        Amazon's `DynamoDB`_ for data storage.
 :Author: Greg Taylor
+:Status: Stable, but un-maintained (Open an issue if interested in maintaining!)
 
 .. _DynamoDB: http://aws.amazon.com/dynamodb/
 
