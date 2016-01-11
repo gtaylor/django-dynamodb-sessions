@@ -3,10 +3,10 @@ import logging
 
 from django.conf import settings
 from django.contrib.sessions.backends.base import SessionBase, CreateError
-from django.core.exceptions import SuspiciousOperation
 
-from boto.dynamodb import connect_to_region
-from boto.dynamodb.exceptions import DynamoDBKeyNotFoundError
+from botocore.exceptions import ClientError
+from boto3.dynamodb.conditions import Attr as DynamoConditionAttr
+from boto3.session import Session as Boto3Session
 
 
 TABLE_NAME = getattr(
@@ -16,20 +16,26 @@ HASH_ATTRIB_NAME = getattr(
 ALWAYS_CONSISTENT = getattr(
     settings, 'DYNAMODB_SESSIONS_ALWAYS_CONSISTENT', True)
 
-AWS_ACCESS_KEY_ID = getattr(
-    settings, 'DYNAMODB_SESSIONS_AWS_ACCESS_KEY_ID', False)
-if not AWS_ACCESS_KEY_ID:
+_BOTO_SESSION = getattr(
+    settings, 'DYNAMODB_SESSIONS_BOTO_SESSION', False)
+
+# Allow a boto session to be provided, i.e. for auto refreshing credentials
+if not _BOTO_SESSION:
     AWS_ACCESS_KEY_ID = getattr(
-        settings, 'AWS_ACCESS_KEY_ID')
+        settings, 'DYNAMODB_SESSIONS_AWS_ACCESS_KEY_ID', False)
+    if not AWS_ACCESS_KEY_ID:
+        AWS_ACCESS_KEY_ID = getattr(
+            settings, 'AWS_ACCESS_KEY_ID')
 
-AWS_SECRET_ACCESS_KEY = getattr(
-    settings, 'DYNAMODB_SESSIONS_AWS_SECRET_ACCESS_KEY', False)
-if not AWS_SECRET_ACCESS_KEY:
-    AWS_SECRET_ACCESS_KEY = getattr(settings, 'AWS_SECRET_ACCESS_KEY')
+    AWS_SECRET_ACCESS_KEY = getattr(
+        settings, 'DYNAMODB_SESSIONS_AWS_SECRET_ACCESS_KEY', False)
+    if not AWS_SECRET_ACCESS_KEY:
+        AWS_SECRET_ACCESS_KEY = getattr(settings, 'AWS_SECRET_ACCESS_KEY')
 
-AWS_REGION_NAME = getattr(settings, 'DYNAMODB_SESSIONS_AWS_REGION_NAME', False)
-if not AWS_REGION_NAME:
-    AWS_REGION_NAME = getattr(settings, 'AWS_REGION_NAME', 'us-east-1')
+    AWS_REGION_NAME = getattr(settings, 'DYNAMODB_SESSIONS_AWS_REGION_NAME',
+                              False)
+    if not AWS_REGION_NAME:
+        AWS_REGION_NAME = getattr(settings, 'AWS_REGION_NAME', 'us-east-1')
 
 # We'll find some better way to do this.
 _DYNAMODB_CONN = None
@@ -42,18 +48,20 @@ def dynamodb_connection_factory():
     Since SessionStore is called for every single page view, we'd be
     establishing new connections so frequently that performance would be
     hugely impacted. We'll lazy-load this here on a per-worker basis. Since
-    boto.dynamodb.layer2.Layer2 objects are state-less (aside from security
+    boto3.resource.('dynamodb')objects are state-less (aside from security
     tokens), we're not too concerned about thread safety issues.
     """
 
     global _DYNAMODB_CONN
+    global _BOTO_SESSION
     if not _DYNAMODB_CONN:
         logger.debug("Creating a DynamoDB connection.")
-        _DYNAMODB_CONN = connect_to_region(
-            AWS_REGION_NAME,
-            aws_access_key_id=AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=AWS_SECRET_ACCESS_KEY
-        )
+        if not _BOTO_SESSION:
+            _BOTO_SESSION = Boto3Session(
+                aws_access_key_id=AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+                region_name=AWS_REGION_NAME)
+        _DYNAMODB_CONN = _BOTO_SESSION.resource('dynamodb')
     return _DYNAMODB_CONN
 
 
@@ -64,7 +72,13 @@ class SessionStore(SessionBase):
 
     def __init__(self, session_key=None):
         super(SessionStore, self).__init__(session_key)
-        self.table = dynamodb_connection_factory().get_table(TABLE_NAME)
+        self._table = None
+
+    @property
+    def table(self):
+        if self._table is None:
+            self._table = dynamodb_connection_factory().Table(TABLE_NAME)
+        return self._table
 
     def load(self):
         """
@@ -75,15 +89,15 @@ class SessionStore(SessionBase):
         :returns: The de-coded session data, as a dict.
         """
 
-        try:
-            item = self.table.get_item(
-                self.session_key, consistent_read=ALWAYS_CONSISTENT)
-        except (DynamoDBKeyNotFoundError, SuspiciousOperation):
+        response = self.table.get_item(
+            Key={'session_key': self.session_key},
+            ConsistentRead=ALWAYS_CONSISTENT)
+        if 'Item' in response:
+            session_data = response['Item']['data']
+            return self.decode(session_data)
+        else:
             self.create()
             return {}
-
-        session_data = item['data']
-        return self.decode(session_data)
 
     def exists(self, session_key):
         """
@@ -94,11 +108,10 @@ class SessionStore(SessionBase):
             ``False`` if not.
         """
 
-        key_already_exists = self.table.has_item(
-            session_key,
-            consistent_read=ALWAYS_CONSISTENT,
-        )
-        if key_already_exists:
+        response = self.table.get_item(
+            Key={'session_key': session_key},
+            ConsistentRead=ALWAYS_CONSISTENT)
+        if 'Item' in response:
             return True
         else:
             return False
@@ -124,8 +137,8 @@ class SessionStore(SessionBase):
         """
         Saves the current session data to the database.
 
-        :keyword bool must_create: If ``True``, a ``CreateError`` exception will
-            be  raised if the saving operation doesn't create a *new* entry
+        :keyword bool must_create: If ``True``, a ``CreateError`` exception
+            will be raised if the saving operation doesn't create a *new* entry
             (as opposed to possibly updating an existing entry).
         :raises: ``CreateError`` if ``must_create`` is ``True`` and a session
             with the current session key already exists.
@@ -139,21 +152,31 @@ class SessionStore(SessionBase):
             self._session_key = None
 
         self._get_or_create_session_key()
-        item = self.table.new_item(self.session_key)
-        # Queue up a PUT operation for UpdateItem, which preserves the
-        # existing 'created' attribute.
-        item.put_attribute('data', self.encode(self._get_session(no_load=must_create)))
 
+        update_kwargs = {
+            'Key': {'session_key': self.session_key},
+        }
+        attribute_names = {'#data': 'data'}
+        attribute_values = {
+            ':data': self.encode(self._get_session(no_load=must_create))
+        }
+        set_updates = ['#data = :data']
         if must_create:
-
-            item.put_attribute('created', int(time.time()))
-            # We expect the data value to be False because we are creating a
-            # new session
-            item.put(expected_value={'data': False})
-        else:
-            # Commits the PUT UpdateItem for the 'data' attrib, meanwhile
-            # leaving the 'created' attrib un-touched.
-            item.save()
+            # Set condition to ensure session with same key doesnt exist
+            update_kwargs['ConditionExpression'] = \
+                DynamoConditionAttr('session_key').not_exists()
+            attribute_values[':created'] = int(time.time())
+            set_updates.append('created = :created')
+        update_kwargs['UpdateExpression'] = 'SET ' + ','.join(set_updates)
+        update_kwargs['ExpressionAttributeValues'] = attribute_values
+        update_kwargs['ExpressionAttributeNames'] = attribute_names
+        try:
+            self.table.update_item(**update_kwargs)
+        except ClientError as e:
+            error_code = e.response['Error']['Code']
+            if error_code == 'ConditionalCheckFailedException':
+                raise CreateError
+            raise
 
     def delete(self, session_key=None):
         """
@@ -168,9 +191,4 @@ class SessionStore(SessionBase):
                 return
             session_key = self.session_key
 
-        key = self.table.layer2.build_key_from_values(
-            self.table.schema,
-            session_key,
-            range_key=None
-        )
-        self.table.layer2.layer1.delete_item(self.table.name, key)
+        self.table.delete_item(Key={'session_key': session_key})
