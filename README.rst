@@ -70,7 +70,7 @@ to see if you need to scale your read/write units up or down.
 If you encounter any bugs, have questions, or would like to share an idea,
 hit up our `issue tracker`_.
 
-.. _Boto: https://github.com/boto/boto
+.. _Boto3: https://github.com/boto/boto3
 .. _issue tracker: https://github.com/gtaylor/django-dynamodb-sessions/issues
 
 Configuration
@@ -89,14 +89,25 @@ The following settings may be used in your ``settings.py``:
                                       This may lead to slightly slower queries,
                                       but you'll never miss object
                                       creation/edits. Defaults to ``True``.
+:DYNAMODB_SESSIONS_BOTO_SESSION: Used instead of providing access_key and
+                                 region, the `boto3.session.Session <http://boto3.readthedocs.org/en/latest/reference/core/session.html>`_
+                                 containing authentication for the AWS account
+                                 to use for DynamoDB.
 :DYNAMODB_SESSIONS_AWS_ACCESS_KEY_ID: The access key for the AWS account
                                       to use for DynamoDB.
 :DYNAMODB_SESSIONS_AWS_SECRET_ACCESS_KEY: The secret for the AWS account
                                           to use for DynamoDB.
 :DYNAMODB_SESSIONS_AWS_REGION_NAME: The region to use for DynamoDB.
 
+
 Changes
 -------
+
+0.7
+^^^
+
+* Switch to boto3 rather than boto for AWS access.
+* Allow passing of boto3 session rather than AWS credentials.
 
 0.6
 ^^^
